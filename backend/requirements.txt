@@ -1,0 +1,6 @@
+flask
+requests
+python-dotenv
+firebase-admin
+torch
+torchvision
