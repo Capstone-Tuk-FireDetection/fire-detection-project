@@ -1,2 +1,3 @@
-# fire-detection-project frontend
-fire-detection-project frontend
+# cap_temp
+
+A new Flutter project.
