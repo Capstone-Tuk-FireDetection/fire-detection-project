@@ -130,8 +130,8 @@ static esp_err_t bmp_handler(httpd_req_t *req) {
   free(buf);
 #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
   uint64_t fr_end = esp_timer_get_time();   // 처리 종료 시간 기록
-#endif
   log_i("BMP: %llums, %uB", (uint64_t)((fr_end - fr_start) / 1000), buf_len);
+#endif
   return res;
 }
 
@@ -197,8 +197,8 @@ fb = esp_camera_fb_get();  //바로 프레임 캡처
   esp_camera_fb_return(fb);
 #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
   int64_t fr_end = esp_timer_get_time();
-#endif
   log_i("JPG: %uB %ums", (uint32_t)(fb_len), (uint32_t)((fr_end - fr_start) / 1000));
+#endif
   return res;
 }
 
@@ -283,8 +283,8 @@ static esp_err_t stream_handler(httpd_req_t *req) {
     frame_time /= 1000;  // 밀리초 단위 변환
 #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
     uint32_t avg_frame_time = ra_filter_run(&ra_filter, frame_time);
-#endif
     log_i("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps)", (uint32_t)(_jpg_buf_len), (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, avg_frame_time, 1000.0 / avg_frame_time);
+#endif
   }
 
   return res;
