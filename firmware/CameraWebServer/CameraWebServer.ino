@@ -15,6 +15,7 @@ DHT dht(DHTPIN, DHTTYPE);
 // 캐시된 센서 값과 갱신 시간
 float cachedHumidity   = NAN;
 float cachedTemperature = NAN;
+int   cachedFlame = -1;
 unsigned long dhtLastRead = 0;
 const unsigned long DHT_INTERVAL = 2000; // 2초
 
@@ -68,6 +69,7 @@ void setup() {
 
   // 불꽃 센서 입력 핀 설정
   pinMode(FLAME_PIN, INPUT);
+  cachedFlame = digitalRead(FLAME_PIN);
   
   // XCLK 주파수 설정 (20MHz)
   config.xclk_freq_hz = 20000000;
@@ -159,5 +161,7 @@ void loop() {
     }
     dhtLastRead = now;
   }
+  // flame 센서 값도 주기적으로 갱신한다.
+  cachedFlame = digitalRead(FLAME_PIN);
   delay(10);  // 다른 작업에 CPU를 양보
 }

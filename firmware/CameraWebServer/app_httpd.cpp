@@ -677,6 +677,7 @@ static esp_err_t index_handler(httpd_req_t *req) {
 
 extern float cachedHumidity;
 extern float cachedTemperature;
+extern int   cachedFlame;
 
 static esp_err_t dht_handler(httpd_req_t *req) {
   if (isnan(cachedHumidity) || isnan(cachedTemperature)) {
@@ -692,7 +693,7 @@ static esp_err_t dht_handler(httpd_req_t *req) {
 }
 // 불꽃 센서 상태를 JSON으로 반환 
 static esp_err_t flame_handler(httpd_req_t *req) {
-  int flame = digitalRead(FLAME_PIN);  // 0: 불꽃 감지, 1: 정상
+  int flame = cachedFlame;  // 0: 불꽃 감지, 1: 정상
   char buf[32]; // JSON 포맷으로
   int len = snprintf(buf, sizeof(buf), "{\"flame\":%d}", flame);
   httpd_resp_set_type(req, "application/json");
