@@ -12,6 +12,11 @@
 #define DHTPIN  15          // DHT22 신호선 연결 핀
 #define DHTTYPE DHT22
 DHT dht(DHTPIN, DHTTYPE);
+// 캐시된 센서 값과 갱신 시간
+float cachedHumidity   = NAN;
+float cachedTemperature = NAN;
+unsigned long dhtLastRead = 0;
+const unsigned long DHT_INTERVAL = 2000; // 2초
 
 #define FLAME_PIN 14 // Flame sensor 신호선 연결 핀
 
@@ -144,7 +149,15 @@ void setup() {
 }
 
 void loop() {
-  // 메인 루프에서는 아무 작업도 하지 않음.
-  // 모든 기능은 웹 서버에서 다른 태스크로 처리됨
-  delay(10000);
+   unsigned long now = millis();
+  if (now - dhtLastRead >= DHT_INTERVAL) {
+    float h = dht.readHumidity();
+    float t = dht.readTemperature();
+    if (!isnan(h) && !isnan(t)) {
+      cachedHumidity = h;
+      cachedTemperature = t;
+    }
+    dhtLastRead = now;
+  }
+  delay(10);  // 다른 작업에 CPU를 양보
 }

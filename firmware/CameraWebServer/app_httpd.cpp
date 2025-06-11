@@ -675,20 +675,21 @@ static esp_err_t index_handler(httpd_req_t *req) {
   }
 }
 
+extern float cachedHumidity;
+extern float cachedTemperature;
+
 static esp_err_t dht_handler(httpd_req_t *req) {
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
-  if (isnan(h) || isnan(t)) {
+  if (isnan(cachedHumidity) || isnan(cachedTemperature)) {
     return httpd_resp_send_500(req);
   }
   char buf[64];
   int len = snprintf(buf, sizeof(buf),
-                     "{\"temperature\":%.2f,\"humidity\":%.2f}", t, h);
+                     "{\"temperature\":%.2f,\"humidity\":%.2f}",
+                     cachedTemperature, cachedHumidity);
   httpd_resp_set_type(req, "application/json");
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
   return httpd_resp_send(req, buf, len);
 }
-
 // 불꽃 센서 상태를 JSON으로 반환 
 static esp_err_t flame_handler(httpd_req_t *req) {
   int flame = digitalRead(FLAME_PIN);  // 0: 불꽃 감지, 1: 정상
