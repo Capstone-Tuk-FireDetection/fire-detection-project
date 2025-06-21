@@ -5,3 +5,4 @@ firebase-admin
 torch
 torchvision
 Pillow
+flask-cors
