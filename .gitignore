@@ -34,3 +34,4 @@ firmware/*.bin
 firmware/*.hex
 firmware/*.map
 
+firebase-adminsdk.json
