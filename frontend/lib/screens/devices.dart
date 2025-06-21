@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/services/device_service.dart';
 
 /// 기기 관리 화면
 class DevicesScreen extends StatefulWidget {
@@ -9,11 +10,39 @@ class DevicesScreen extends StatefulWidget {
 }
 
 class _DevicesScreenState extends State<DevicesScreen> {
-  final List<String> _devices = const ['A', 'B', 'C'];
-  late String _selected = _devices.first;
+  List<Map<String, dynamic>> _devices = [];
+  String? _selected;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDevices();
+  }
+
+  Future<void> _loadDevices() async {
+    try {
+      final devices = await DeviceService.instance.fetchDevices();
+      setState(() {
+        _devices = devices;
+        _selected = devices.isNotEmpty ? devices.first['device_id'] as String? : null;
+      });
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(child: Text(_error!));
+    }
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -22,9 +51,12 @@ class _DevicesScreenState extends State<DevicesScreen> {
           value: _selected,
           isExpanded: true,
           items: _devices
-              .map((d) => DropdownMenuItem(value: d, child: Text('단말기 $d')))
+              .map((d) => DropdownMenuItem(
+                    value: d['device_id'] as String,
+                    child: Text(d['nickname'] as String),
+                  ))
               .toList(),
-          onChanged: (v) => setState(() => _selected = v!),
+          onChanged: (v) => setState(() => _selected = v),
         ),
         const SizedBox(height: 16),
 
