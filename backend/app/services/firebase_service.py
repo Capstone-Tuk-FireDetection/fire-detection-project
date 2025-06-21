@@ -1,23 +1,34 @@
 import os
 from firebase_admin import credentials, initialize_app, auth, firestore
 
-_cred_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-if not _cred_path:
-    raise RuntimeError('GOOGLE_APPLICATION_CREDENTIALS not set')
+firebase_app = None
+_db = None
 
-cred = credentials.Certificate(_cred_path)
-firebase_app = initialize_app(cred)
 
-db = firestore.client()
+def initialize_firebase():
+    """Initialize Firebase app and Firestore client if not already initialized."""
+    global firebase_app, _db
+    if firebase_app is None:
+        cred_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+        if not cred_path:
+            raise RuntimeError('GOOGLE_APPLICATION_CREDENTIALS not set')
+        cred = credentials.Certificate(cred_path)
+        firebase_app = initialize_app(cred)
+        _db = firestore.client()
+    return firebase_app
+
 
 def verify_id_token(id_token: str):
-    """Verify Firebase ID token and return decoded token."""
+    """Verify a Firebase ID token and return the decoded data or None."""
+    initialize_firebase()
     try:
         return auth.verify_id_token(id_token, app=firebase_app)
     except Exception:
         return None
 
+
 def get_user_devices(uid: str):
-    """Return list of device docs for a given user UID."""
-    docs = db.collection('devices').where('owner', '==', uid).stream()
+    """Fetch devices belonging to a specific user UID."""
+    initialize_firebase()
+    docs = _db.collection('devices').where('owner', '==', uid).stream()
     return [doc.to_dict() for doc in docs]
