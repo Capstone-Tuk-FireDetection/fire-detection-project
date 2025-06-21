@@ -10,16 +10,36 @@
 
 #include "DHT.h"
 #define DHTPIN  15          // DHT22 신호선 연결 핀
+#define FLAME_PIN 14 // Flame sensor 신호선 연결 핀
 #define DHTTYPE DHT22
 DHT dht(DHTPIN, DHTTYPE);
+
 // 캐시된 센서 값과 갱신 시간
 float cachedHumidity   = NAN;
 float cachedTemperature = NAN;
 int   cachedFlame = -1;
-unsigned long dhtLastRead = 0;
-const unsigned long DHT_INTERVAL = 2000; // 2초
 
-#define FLAME_PIN 14 // Flame sensor 신호선 연결 핀
+void dhtTask(void *param) {
+  dht.begin();  // 반드시 Task 내부에서 초기화
+  while (true) {
+    float h = dht.readHumidity();
+    float t = dht.readTemperature();
+    if (!isnan(h) && !isnan(t)) {
+      cachedHumidity = h;
+      cachedTemperature = t;
+    } else {
+      Serial.println("DHT read failed");
+    }
+    vTaskDelay(pdMS_TO_TICKS(3000));  // 2초 주기
+  }
+}
+
+void flameTask(void *param) {
+  while (true) {
+    cachedFlame = digitalRead(FLAME_PIN);
+    vTaskDelay(pdMS_TO_TICKS(200));  // 빠르게 읽지만 CPU 너무 쓰지 않도록
+  }
+}
 
 // WiFi credentials are loaded from wifi_config.h
 #include "wifi_config.h"
@@ -138,11 +158,11 @@ void setup() {
   }
   Serial.println("");
   Serial.println("WiFi connected");
-
-  dht.begin();
-
-  // 카메라 서버 실행 함수 호출 (웹 인터페이스 등)
   startCameraServer();
+
+  xTaskCreatePinnedToCore(dhtTask, "DHT Sensor Task", 2048, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(flameTask, "Flame Task", 1024, NULL, 1, NULL, 1);
+  // 카메라 서버 실행 함수 호출 (웹 인터페이스 등)
 
   // 연결된 IP 주소를 출력하여 접속 방법 안내
   Serial.print("Camera Ready! Use 'http://");
@@ -150,18 +170,6 @@ void setup() {
   Serial.println("' to connect");
 }
 
-void loop() {
-   unsigned long now = millis();
-  if (now - dhtLastRead >= DHT_INTERVAL) {
-    float h = dht.readHumidity();
-    float t = dht.readTemperature();
-    if (!isnan(h) && !isnan(t)) {
-      cachedHumidity = h;
-      cachedTemperature = t;
-    }
-    dhtLastRead = now;
-  }
-  // flame 센서 값도 주기적으로 갱신한다.
-  cachedFlame = digitalRead(FLAME_PIN);
+void loop() {  
   delay(10);  // 다른 작업에 CPU를 양보
 }
