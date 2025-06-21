@@ -30,9 +30,9 @@ def stream_proxy():
         finally:
             upstream.close()
 
-    content_type = upstream.headers.get(
-        "Content-Type", "multipart/x-mixed-replace"
-    )
+    # The ESP32 sometimes omits the boundary parameter. Use a fixed MIME type
+    # expected by most MJPEG clients.
+    content_type = "multipart/x-mixed-replace; boundary=frame"
 
     return Response(
         stream_with_context(generate()),
