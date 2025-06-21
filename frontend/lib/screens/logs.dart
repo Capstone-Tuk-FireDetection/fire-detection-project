@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// 로그 조회 화면
 class LogsScreen extends StatefulWidget {
@@ -12,7 +13,7 @@ class _LogsScreenState extends State<LogsScreen> {
   // ─── 더미 데이터 ───────────────────────────────────────────────────
   final List<String> _devices = const ['A', 'B', 'C'];
 
-  final Map<String, List<Map<String, String>>> _deviceLogs = const {
+  final Map<String, List<Map<String, String>>> _deviceLogs = {
     'A': [
       {'date': '2024/12/04', 'time': '15:25', 'temp': '24°C'},
       {'date': '2025/01/04', 'time': '14:25', 'temp': '23°C'},
@@ -26,6 +27,47 @@ class _LogsScreenState extends State<LogsScreen> {
   // ──────────────────────────────────────────────────────────────
 
   String _selected = '전체';
+
+  void _copyLogs() {
+    final text = _logs
+        .map((l) =>
+            '${l['device']} ${l['date']} ${l['time']} ${l['temp']}')
+        .join('\n');
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('로그가 복사되었습니다')));
+  }
+
+  void _deleteLogs() {
+    showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        content: const Text('표시된 로그를 삭제할까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    ).then((confirm) {
+      if (confirm == true) {
+        setState(() {
+          if (_selected == '전체') {
+            for (final k in _deviceLogs.keys) {
+              _deviceLogs[k]!.clear();
+            }
+          } else {
+            _deviceLogs[_selected]!.clear();
+          }
+        });
+      }
+    });
+  }
 
   List<Map<String, String>> get _logs => _selected == '전체'
       ? _deviceLogs.entries
@@ -74,13 +116,13 @@ class _LogsScreenState extends State<LogsScreen> {
         ),
         const SizedBox(height: 16),
 
-        // 복사·삭제 버튼 (기능은 TODO)
+        // 복사·삭제 버튼
         Wrap(
           spacing: 8,
           children: [
-            ElevatedButton(onPressed: () {}, child: const Text('복사')),
+            ElevatedButton(onPressed: _copyLogs, child: const Text('복사')),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: _deleteLogs,
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               child: const Text('삭제'),
             ),

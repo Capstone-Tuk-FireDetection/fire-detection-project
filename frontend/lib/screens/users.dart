@@ -64,8 +64,26 @@ class _UsersScreenState extends State<UsersScreen> {
         // (예시) 계정 삭제 버튼
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          onPressed: () {
-            // TODO: 삭제 기능이 필요하면 구현
+          onPressed: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                content: const Text('해당 계정을 삭제할까요?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('취소'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('삭제'),
+                  ),
+                ],
+              ),
+            );
+            if (confirm == true) {
+              await AuthService.instance.deleteUser(_selectedEmail);
+            }
           },
           child: const Text('삭제'),
         ),
