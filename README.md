@@ -15,6 +15,7 @@ Create a `.env` file in the repository root with the location of your Firebase s
 
 ```env
 GOOGLE_APPLICATION_CREDENTIALS=backend/firebase-adminsdk.json
+ESP32_STREAM_URL=http://<esp32-ip>/stream
 ```
 
 The backend loads this variable at start up.
