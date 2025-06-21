@@ -28,7 +28,36 @@ def verify_id_token(id_token: str):
 
 
 def get_user_devices(uid: str):
-    """Fetch devices belonging to a specific user UID."""
+    """Return a list of devices for the given user UID."""
     initialize_firebase()
-    docs = _db.collection('devices').where('owner', '==', uid).stream()
+    docs = (
+        _db.collection("users")
+        .document(uid)
+        .collection("devices")
+        .stream()
+    )
     return [doc.to_dict() for doc in docs]
+
+
+def add_user_device(uid: str, device_id: str, nickname: str) -> None:
+    """Add a device under the specified user."""
+    initialize_firebase()
+    doc_ref = (
+        _db.collection("users")
+        .document(uid)
+        .collection("devices")
+        .document(device_id)
+    )
+    doc_ref.set({"device_id": device_id, "nickname": nickname})
+
+
+def delete_user_device(uid: str, device_id: str) -> None:
+    """Delete a user's device by its ID."""
+    initialize_firebase()
+    doc_ref = (
+        _db.collection("users")
+        .document(uid)
+        .collection("devices")
+        .document(device_id)
+    )
+    doc_ref.delete()
