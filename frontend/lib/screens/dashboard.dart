@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+import '../widgets/status_row.dart';
+import '../core/services/system_status_service.dart';
 
 /// 홈 대시보드 화면
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
-  // ─── 예시용 더미 데이터 ───────────────────────────────────────────────
-  final List<String> _devices = const ['A', 'B', 'C'];
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
 
+class _DashboardScreenState extends State<DashboardScreen> {
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic>? _status;
+
+  // ─── 예시용 더미 데이터 ───────────────────────────────────────────────
+  
   final Map<String, List<Map<String, String>>> _deviceLogs = const {
     'A': [
       {'date': '2024/12/04', 'time': '15:25', 'temp': '24°C'},
@@ -21,7 +31,31 @@ class DashboardScreen extends StatelessWidget {
   // ────────────────────────────────────────────────────────────────
 
   @override
+  void initState() {
+    super.initState();
+    _loadStatus();
+  }
+
+  Future<void> _loadStatus() async {
+    try {
+      final data = await SystemStatusService.instance.fetchStatus();
+      setState(() => _status = data);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(child: Text(_error!));
+    }
+
     final recentLogs = _deviceLogs.entries
         .expand((e) => e.value.map((m) => {...m, 'device': e.key}))
         .take(5)
@@ -41,9 +75,15 @@ class DashboardScreen extends StatelessWidget {
                   const Text('시스템 상태',
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  _StatusRow('서버 온라인'),
+                  StatusRow(
+                      label: '서버 '
+                          '${_status?['server'] == 'online' ? '온라인' : '오프라인'}'),
                   const SizedBox(height: 12),
-                  ..._devices.map((d) => _StatusRow('단말기 $d 온라인')),
+                  ...(_status?['devices'] as List<dynamic>? ?? [])
+                      .cast<Map<String, dynamic>>()
+                      .map((d) => StatusRow(
+                          label:
+                              '단말기 ${d['device_id']} ${d['status'] == 'online' ? '온라인' : '오프라인'}')),
                 ],
               ),
             ),
@@ -86,19 +126,4 @@ class DashboardScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-/// 대시보드용 상태 줄
-class _StatusRow extends StatelessWidget {
-  const _StatusRow(this.label);
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          const Icon(Icons.circle, color: Colors.green, size: 16),
-          const SizedBox(width: 8),
-          Text(label, style: const TextStyle(fontSize: 16)),
-        ],
-      );
 }
