@@ -8,8 +8,10 @@ class DeviceService {
   /// Base URL of the Flask backend
   final String baseUrl = 'http://localhost:5000';
 
+
   /// MJPEG stream endpoint
   Uri get streamUri => Uri.parse('$baseUrl/api/stream-proxy');
+
 
   Future<List<Map<String, dynamic>>> fetchDevices() async {
     final uri = Uri.parse('$baseUrl/api/devices');
