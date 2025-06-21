@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'core/auth_gate.dart';
 import 'home_scaffold.dart';
-
+import 'core/services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // await Firebase.initializeApp();  // 뒤에 Firebase 넣을 때
+  await AuthService.instance.init();   // ← UserStore 초기화
   runApp(const FireDetectionAdminApp());
 }
 

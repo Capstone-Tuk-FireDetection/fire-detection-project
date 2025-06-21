@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../core/services/user_store.dart';
+import '../core/services/auth_service.dart';
 
-/// 사용자 관리 화면
+/// 모든 계정을 실시간 표시하는 사용자 관리 화면
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
 
@@ -9,76 +11,71 @@ class UsersScreen extends StatefulWidget {
 }
 
 class _UsersScreenState extends State<UsersScreen> {
-  // ─── 예시용 더미 사용자 목록 ──────────────────────────────────────────
-  final List<Map<String, String>> _users = const [
-    {
-      'name': 'TUK',
-      'email': 'admin@tukorea.ac.kr',
-      'role': '관리자',
-      'status': '온라인'
-    },
-    {
-      'name': 'Tino',
-      'email': '123123@tukorea.ac.kr',
-      'role': '일반',
-      'status': '온라인'
-    },
-  ];
-  // ────────────────────────────────────────────────────────────────
-
-  late Map<String, String> _selectedUser;
+  late String _selectedEmail;
 
   @override
   void initState() {
     super.initState();
-    _selectedUser = _users.first; // 초기 선택
+    final emails = UserStore.instance.allUsers.keys.toList();
+    _selectedEmail = emails.first;
+    // AuthService 변경 알림을 수신해 리스트 갱신
+    AuthService.instance.addListener(_refreshOnChange);
+  }
+
+  void _refreshOnChange() {
+    setState(() {
+      // 새로 가입한 계정이 있을 수 있으므로 선택 값 보정
+      if (!UserStore.instance.allUsers.containsKey(_selectedEmail)) {
+        _selectedEmail = UserStore.instance.allUsers.keys.first;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    AuthService.instance.removeListener(_refreshOnChange);
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final users = UserStore.instance.allUsers;
+    final selected = users[_selectedEmail]!;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // 사용자 선택 드롭다운
+        // 🔽 이메일 기준 드롭다운
         DropdownButton<String>(
-          value: _selectedUser['name'],
+          value: _selectedEmail,
           isExpanded: true,
-          items: _users
-              .map((u) =>
-                  DropdownMenuItem(value: u['name'], child: Text(u['name']!)))
+          items: users.keys
+              .map((email) =>
+                  DropdownMenuItem(value: email, child: Text(email)))
               .toList(),
-          onChanged: (v) =>
-              setState(() => _selectedUser = _users.firstWhere((u) => u['name'] == v)),
+          onChanged: (v) => setState(() => _selectedEmail = v!),
         ),
         const SizedBox(height: 16),
 
-        // 상세 정보
-        _detailTile('상태', _selectedUser['status']!),
-        _detailTile('이메일', _selectedUser['email']!),
-        _detailTile('가입 일자', '2024/12/22 15:23'),
-        _detailTile('등급', _selectedUser['role']!),
+        _detailTile('권한', selected['role']!),
+        _detailTile('이메일', _selectedEmail),
         const SizedBox(height: 24),
 
-        // 액션 버튼
-        Wrap(
-          spacing: 8,
-          children: [
-            ElevatedButton(onPressed: () {}, child: const Text('등급 변경')),
-            ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('삭제'),
-            ),
-          ],
+        // (예시) 계정 삭제 버튼
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          onPressed: () {
+            // TODO: 삭제 기능이 필요하면 구현
+          },
+          child: const Text('삭제'),
         ),
       ],
     );
   }
 
-  /// 간단한 라벨-값 표시 타일
   Widget _detailTile(String label, String value) => ListTile(
         title: Text(label),
-        trailing:
-            Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+        trailing: Text(value,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
       );
 }

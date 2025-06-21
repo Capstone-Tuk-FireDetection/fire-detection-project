@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/services/auth_service.dart';   // ★추가
 
 // 각 탭 화면
 import 'screens/dashboard.dart';
@@ -36,9 +37,7 @@ class _HomeScaffoldState extends State<HomeScaffold> {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: '로그아웃',
-            onPressed: () {
-              // TODO: 로그아웃 로직
-            },
+           onPressed: () => AuthService.instance.signOut(),
           ),
         ],
       ),

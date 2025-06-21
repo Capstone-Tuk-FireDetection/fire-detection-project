@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/services/auth_service.dart';   // signIn()
-
+import 'register.dart'; 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -48,6 +48,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _onLoginPressed,
                         child: const Text('로그인'),
                       ),
+                      TextButton(
+                         onPressed: () => Navigator.push(
+                           context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                         child: const Text('회원가입'),
+                      ),
               ],
             ),
           ),
@@ -55,14 +60,16 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  /// ✔️ 이메일·비밀번호 형식과 무관하게 즉시 로그인 처리
-  Future<void> _onLoginPressed() async {
-    setState(() => _loading = true);
-    await AuthService.instance
-        .signIn(_emailCtrl.text.trim(), _pwCtrl.text.trim());
-    setState(() => _loading = false);
-    // AuthGate 가 상태 변화를 감지해 홈 화면으로 전환합니다.
+Future<void> _onLoginPressed() async {
+  setState(() => _loading = true);
+  final error = await AuthService.instance
+      .signIn(_emailCtrl.text.trim(), _pwCtrl.text.trim());
+  setState(() => _loading = false);
+  if (error != null) {
+    showDialog(context: context, builder: (_) =>
+      AlertDialog(content: Text(error), actions:[
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('확인'))
+      ]));
   }
 
   @override
@@ -71,4 +78,5 @@ class _LoginScreenState extends State<LoginScreen> {
     _pwCtrl.dispose();
     super.dispose();
   }
+}
 }
