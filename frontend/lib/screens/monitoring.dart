@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/services/device_service.dart';
 
 /// 실시간 모니터링 화면
 class MonitoringScreen extends StatefulWidget {
@@ -9,13 +10,40 @@ class MonitoringScreen extends StatefulWidget {
 }
 
 class _MonitoringScreenState extends State<MonitoringScreen> {
-  // ─── 예시용 더미 기기 목록 ────────────────────────────────────────────
-  final List<String> _devices = const ['A', 'B', 'C'];
-  late String _selected = _devices.first;
-  // ────────────────────────────────────────────────────────────────
+  List<Map<String, dynamic>> _devices = [];
+  String? _selected;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDevices();
+  }
+
+  Future<void> _loadDevices() async {
+    try {
+      final devices = await DeviceService.instance.fetchDevices();
+      setState(() {
+        _devices = devices;
+        _selected =
+            devices.isNotEmpty ? devices.first['device_id'] as String? : null;
+      });
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(child: Text(_error!));
+    }
     return Column(
       children: [
         // 기기 선택
@@ -25,26 +53,26 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
             value: _selected,
             isExpanded: true,
             items: _devices
-                .map((d) => DropdownMenuItem(value: d, child: Text('단말기 $d')))
+                .map((d) => DropdownMenuItem(
+                      value: d['device_id'] as String,
+                      child: Text(d['nickname'] as String),
+                    ))
                 .toList(),
-            onChanged: (v) => setState(() => _selected = v!),
+            onChanged: (v) => setState(() => _selected = v),
           ),
         ),
 
-        // 비디오 스트림(더미)
+        // 비디오 스트림
         Expanded(
           child: Center(
             child: AspectRatio(
               aspectRatio: 16 / 9,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  border: Border.all(color: Colors.grey),
-                ),
-                child: const Center(
-                  child: Text(
-                    '카메라 영상 (클릭하여 스트림)',
-                    style: TextStyle(fontSize: 18),
+              child: ClipRect(
+                child: Image.network(
+                  DeviceService.instance.streamUri.toString(),
+                  fit: BoxFit.cover,
+                  errorBuilder: (c, e, s) => const Center(
+                    child: Text('스트림을 불러올 수 없습니다'),
                   ),
                 ),
               ),
