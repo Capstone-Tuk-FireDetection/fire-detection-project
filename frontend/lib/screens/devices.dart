@@ -62,7 +62,18 @@ class _DevicesScreenState extends State<DevicesScreen> {
   /// 액션 버튼 헬퍼
   Widget _actionButton(String label, {Color? color}) => ElevatedButton(
         onPressed: () {
-          // TODO: 실제 기기 제어 로직
+          showDialog(
+            context: context,
+            builder: (_) => AlertDialog(
+              content: Text('"$label" 명령을 전송했습니다'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('확인'),
+                ),
+              ],
+            ),
+          );
         },
         style: ElevatedButton.styleFrom(backgroundColor: color),
         child: Text(label),

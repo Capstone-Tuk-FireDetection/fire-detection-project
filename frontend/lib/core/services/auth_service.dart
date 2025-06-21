@@ -48,4 +48,13 @@ class AuthService with ChangeNotifier {
     _role = null;
     notifyListeners();
   }
+
+  Future<void> deleteUser(String email) async {
+    await UserStore.instance.removeUser(email);
+    if (_email == email) {
+      await signOut();
+    } else {
+      notifyListeners();
+    }
+  }
 }

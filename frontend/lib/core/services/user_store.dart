@@ -45,4 +45,9 @@ class UserStore {
   }
 
   Map<String, String>? getUser(String email) => _users[email];
+
+  Future<void> removeUser(String email) async {
+    _users.remove(email);
+    await _persist();
+  }
 }
