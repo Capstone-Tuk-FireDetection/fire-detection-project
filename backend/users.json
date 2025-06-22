@@ -1,4 +1,14 @@
 {
-  "TUK@tukorea.ac.kr": {"pw": "123", "role": "관리자"},
-  "Tino@tukorea.ac.kr": {"pw": "123", "role": "일반"}
+  "TUK@tukorea.ac.kr": {
+    "pw": "123",
+    "role": "관리자"
+  },
+  "Tino@tukorea.ac.kr": {
+    "pw": "123",
+    "role": "일반"
+  },
+  "hhssjj1022@naver.com": {
+    "pw": "asdf",
+    "role": "관리자"
+  }
 }
