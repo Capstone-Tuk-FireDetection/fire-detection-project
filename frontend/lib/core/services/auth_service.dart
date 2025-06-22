@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'user_store.dart';
 
 class AuthService with ChangeNotifier {
@@ -18,28 +20,39 @@ class AuthService with ChangeNotifier {
 
  // …위쪽 코드 동일…
   Future<String?> signUp(String email, String pw, String role) async {
-    if (UserStore.instance.contains(email)) {
-      return '이미 존재하는 이메일입니다';
+    final uri = Uri.parse('http://localhost:5000/api/register');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'password': pw, 'role': role}),
+    );
+    if (response.statusCode == 201) {
+      notifyListeners();
+      return null;
     }
-    await UserStore.instance.addUser(email, pw, role);
-
-    notifyListeners();           // ⭐️ 신규: UI(UsersScreen) 갱신 트리거
-    return null;                 // null = 성공
+    final Map<String, dynamic> decoded = json.decode(response.body);
+    return decoded['error'] as String? ?? '가입 실패';
   }
 // …아래쪽 코드 동일…
 
 
   /// 로그인 (이메일·비밀번호 체크)
   Future<String?> signIn(String email, String pw) async {
-    final user = UserStore.instance.getUser(email);
-    if (user == null || user['pw'] != pw) {
-      return '이메일 또는 비밀번호가 일치하지 않습니다';
+    final uri = Uri.parse('http://localhost:5000/api/login');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'password': pw}),
+    );
+    final Map<String, dynamic> decoded = json.decode(response.body);
+    if (response.statusCode == 200) {
+      _loggedIn = true;
+      _email = email;
+      _role = decoded['role'] as String?;
+      notifyListeners();
+      return null;
     }
-    _loggedIn = true;
-    _email = email;
-    _role = user['role'];
-    notifyListeners();
-    return null;
+    return decoded['error'] as String? ?? '로그인 실패';
   }
   
   Future<void> signOut() async {
