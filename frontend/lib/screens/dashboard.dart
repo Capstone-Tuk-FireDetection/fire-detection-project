@@ -12,8 +12,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _loading = true;
-  String? _error;
   Map<String, dynamic>? _status;
+  bool _serverOnline = false;
 
   // ─── 예시용 더미 데이터 ───────────────────────────────────────────────
   
@@ -39,9 +39,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadStatus() async {
     try {
       final data = await SystemStatusService.instance.fetchStatus();
-      setState(() => _status = data);
+      setState(() {
+        _status = data;
+        _serverOnline = true;
+      });
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() {
+        _serverOnline = false;
+        _status = null;
+      });
     } finally {
       setState(() => _loading = false);
     }
@@ -52,14 +58,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_error != null) {
-      return Center(child: Text(_error!));
-    }
 
     final recentLogs = _deviceLogs.entries
         .expand((e) => e.value.map((m) => {...m, 'device': e.key}))
         .take(5)
         .toList();
+
+    final serverOnline = _serverOnline && _status?['server'] == 'online';
+    final devices = serverOnline
+        ? (_status?['devices'] as List<dynamic>? ?? [])
+            .cast<Map<String, dynamic>>()
+        : _deviceLogs.keys
+            .map((id) => {'device_id': id, 'status': 'offline'})
+            .toList();
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -76,14 +87,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   StatusRow(
-                      label: '서버 '
-                          '${_status?['server'] == 'online' ? '온라인' : '오프라인'}'),
+                      label: '서버 ' + (serverOnline ? '온라인' : '오프라인'),
+                      iconColor: serverOnline ? Colors.green : Colors.red),
                   const SizedBox(height: 12),
-                  ...(_status?['devices'] as List<dynamic>? ?? [])
-                      .cast<Map<String, dynamic>>()
-                      .map((d) => StatusRow(
-                          label:
-                              '단말기 ${d['device_id']} ${d['status'] == 'online' ? '온라인' : '오프라인'}')),
+                  ...devices.map((d) => StatusRow(
+                        label:
+                            '단말기 ${d['device_id']} ${d['status'] == 'online' ? '온라인' : '오프라인'}',
+                        iconColor: d['status'] == 'online'
+                            ? Colors.green
+                            : Colors.red,
+                      )),
                 ],
               ),
             ),
