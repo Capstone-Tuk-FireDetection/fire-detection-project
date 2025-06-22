@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../core/services/device_service.dart';
+import '../core/services/logs_service.dart';
 
 /// 로그 조회 화면
 class LogsScreen extends StatefulWidget {
@@ -10,23 +12,45 @@ class LogsScreen extends StatefulWidget {
 }
 
 class _LogsScreenState extends State<LogsScreen> {
-  // ─── 더미 데이터 ───────────────────────────────────────────────────
-  final List<String> _devices = const ['A', 'B', 'C'];
-
-  final Map<String, List<Map<String, String>>> _deviceLogs = {
-    'A': [
-      {'date': '2024/12/04', 'time': '15:25', 'temp': '24°C'},
-      {'date': '2025/01/04', 'time': '14:25', 'temp': '23°C'},
-      {'date': '2025/02/03', 'time': '01:21', 'temp': '32°C'},
-    ],
-    'B': [
-      {'date': '2025/02/03', 'time': '01:21', 'temp': '32°C'},
-    ],
-    'C': [],
-  };
-  // ──────────────────────────────────────────────────────────────
-
+  List<String> _devices = [];
+  List<Map<String, dynamic>> _logs = [];
   String _selected = '전체';
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitial();
+  }
+
+  Future<void> _loadInitial() async {
+    try {
+      final devices = await DeviceService.instance.fetchDevices();
+      setState(() {
+        _devices = devices.map((d) => d['device_id'] as String).toList();
+      });
+    } catch (_) {
+      // ignore errors fetching devices
+    }
+    await _loadLogs();
+  }
+
+  Future<void> _loadLogs() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final logs = await LogsService.instance
+          .fetchLogs(device: _selected == '전체' ? null : _selected);
+      setState(() => _logs = logs);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
 
   void _copyLogs() {
     final text = _logs
@@ -54,31 +78,28 @@ class _LogsScreenState extends State<LogsScreen> {
           ),
         ],
       ),
-    ).then((confirm) {
+    ).then((confirm) async {
       if (confirm == true) {
-        setState(() {
-          if (_selected == '전체') {
-            for (final k in _deviceLogs.keys) {
-              _deviceLogs[k]!.clear();
-            }
-          } else {
-            _deviceLogs[_selected]!.clear();
-          }
-        });
+        try {
+          await LogsService.instance
+              .deleteLogs(device: _selected == '전체' ? null : _selected);
+          await _loadLogs();
+        } catch (e) {
+          setState(() => _error = e.toString());
+        }
       }
     });
   }
 
-  List<Map<String, String>> get _logs => _selected == '전체'
-      ? _deviceLogs.entries
-          .expand((e) => e.value.map((m) => {...m, 'device': e.key}))
-          .toList()
-      : _deviceLogs[_selected]!
-          .map((m) => {...m, 'device': _selected})
-          .toList();
-
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(child: Text(_error!));
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -89,7 +110,10 @@ class _LogsScreenState extends State<LogsScreen> {
           items: ['전체', ..._devices]
               .map((d) => DropdownMenuItem(value: d, child: Text('단말기 $d')))
               .toList(),
-          onChanged: (v) => setState(() => _selected = v!),
+          onChanged: (v) {
+            setState(() => _selected = v!);
+            _loadLogs();
+          },
         ),
         const SizedBox(height: 16),
 
