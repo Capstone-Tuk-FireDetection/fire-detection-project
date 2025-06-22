@@ -15,29 +15,34 @@
 DHT dht(DHTPIN, DHTTYPE);
 
 // 캐시된 센서 값과 갱신 시간
+volatile bool allowStreaming = true;
 float cachedHumidity   = NAN;
 float cachedTemperature = NAN;
 int   cachedFlame = -1;
 
-void dhtTask(void *param) {
-  dht.begin();  // 반드시 Task 내부에서 초기화
-  while (true) {
-    float h = dht.readHumidity();
-    float t = dht.readTemperature();
-    if (!isnan(h) && !isnan(t)) {
-      cachedHumidity = h;
-      cachedTemperature = t;
+void sensorTask(void *param) {
+  dht.begin();
+  for (;;) {
+    allowStreaming = false;
+    delay(120);  // 스트리밍 중단 대기 시간
+
+    float h1 = dht.readHumidity();
+    float t1 = dht.readTemperature();
+    vTaskDelay(pdMS_TO_TICKS(300));
+    float h2 = dht.readHumidity();
+    float t2 = dht.readTemperature();
+
+    if (!isnan(h1) && !isnan(t1) && !isnan(h2) && !isnan(t2)) {
+      cachedHumidity = (h1 + h2) / 2.0;
+      cachedTemperature = (t1 + t2) / 2.0;
     } else {
       Serial.println("DHT read failed");
     }
-    vTaskDelay(pdMS_TO_TICKS(3000));  // 2초 주기
-  }
-}
 
-void flameTask(void *param) {
-  while (true) {
     cachedFlame = digitalRead(FLAME_PIN);
-    vTaskDelay(pdMS_TO_TICKS(200));  // 빠르게 읽지만 CPU 너무 쓰지 않도록
+    allowStreaming = true;
+
+    vTaskDelay(pdMS_TO_TICKS(3000));
   }
 }
 
@@ -57,18 +62,14 @@ void startCameraServer();
 void setupLedFlash(int pin);
 
 void setup() {
-  // 시리얼 통신 시작 - 디버깅 메시지 출력을 위해 115200 baudrate 사용
   Serial.begin(115200);
   Serial.setDebugOutput(true);
-  Serial.println();
 
-  // 카메라 설정을 위한 구조체 변수 생성
+  pinMode(FLAME_PIN, INPUT);
+
   camera_config_t config;
-  // PWM 제어를 위한 채널 및 타이머 설정
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
-  
-  // 카메라 데이터 핀 설정 (camera_pins.h에 정의된 핀 번호 사용)
   config.pin_d0 = Y2_GPIO_NUM;
   config.pin_d1 = Y3_GPIO_NUM;
   config.pin_d2 = Y4_GPIO_NUM;
@@ -83,88 +84,32 @@ void setup() {
   config.pin_href = HREF_GPIO_NUM;
   config.pin_sccb_sda = SIOD_GPIO_NUM;
   config.pin_sccb_scl = SIOC_GPIO_NUM;
-  // 전원 제어 핀 설정 (카메라의 전원 및 리셋 제어)
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-
-  // 불꽃 센서 입력 핀 설정
-  pinMode(FLAME_PIN, INPUT);
-  cachedFlame = digitalRead(FLAME_PIN);
-  
-  // XCLK 주파수 설정 (20MHz)
   config.xclk_freq_hz = 20000000;
-  // 기본 프레임 크기를 VGA로 설정
-  config.frame_size = FRAMESIZE_VGA;
-  // 스트리밍용 JPEG 포맷 사용 (얼굴 인식 등 다른 기능은 RGB565 사용 가능)
-  config.pixel_format = PIXFORMAT_JPEG;  // 스트리밍 전용
-  // config.pixel_format = PIXFORMAT_RGB565; // 얼굴 검출/인식을 위한 설정 예시
-  
-  // 프레임 버퍼 획득 방식 설정: 빈 버퍼가 있을 때 가져옴
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
-  // 프레임 버퍼를 PSRAM에 할당 (PSRAM이 없는 경우 DRAM 사용 고려)
+  config.frame_size = FRAMESIZE_QQVGA;
+  config.pixel_format = PIXFORMAT_JPEG;
   config.fb_location = CAMERA_FB_IN_PSRAM;
-  // JPEG 압축 품질 (수치가 낮을수록 고화질)
-  config.jpeg_quality = 12;
-  // 프레임 버퍼 개수
+  config.jpeg_quality = 14;
   config.fb_count = 1;
+  config.grab_mode = CAMERA_GRAB_LATEST;
 
-  // 만약 PSRAM이 있다면, 해상도와 JPEG 품질을 조정하여 프레임 버퍼 용량을 증가시킴
-  if (config.pixel_format == PIXFORMAT_JPEG) {
-    if (psramFound()) {
-      config.jpeg_quality = 10;      // JPEG 품질 향상
-      config.fb_count = 2;           // 프레임 버퍼 2개 사용
-      config.grab_mode = CAMERA_GRAB_LATEST;  // 최신 프레임 우선
-    } else {
-      // PSRAM이 없을 경우 프레임 크기를 제한하고 DRAM에 프레임 버퍼 할당
-      config.frame_size = FRAMESIZE_SVGA;
-      config.fb_location = CAMERA_FB_IN_DRAM;
-    }
-  } else {
-    // 얼굴 인식용으로 사용할 경우 최적의 설정 (해상도를 240x240으로 설정)
-    config.frame_size = FRAMESIZE_240X240;
-  }
-
-  // 카메라 초기화
-  esp_err_t err = esp_camera_init(&config);
-  if (err != ESP_OK) {
-    // 초기화 실패 시 에러 코드 출력 후 함수 종료
-    Serial.printf("Camera init failed with error 0x%x", err);
+  if (esp_camera_init(&config) != ESP_OK) {
+    Serial.println("Camera init failed");
     return;
   }
 
-  // 카메라 센서 정보 획득
-  sensor_t *s = esp_camera_sensor_get();
-  
-  // JPEG 포맷일 경우 초기 프레임 속도를 높이기 위해 해상도를 QVGA(320x240)로 낮춤
-  if (config.pixel_format == PIXFORMAT_JPEG) {
-    s->set_framesize(s, FRAMESIZE_QVGA);
-  }
-
-  // camera_pins.h에 LED 관련 핀 번호가 정의되어 있다면 LED 플래시 설정 함수 호출
-#if defined(LED_GPIO_NUM)
-  setupLedFlash(LED_GPIO_NUM);
-#endif
-
-  // WiFi 연결 시작
-  WiFi.begin(ssid, password);
-  // WiFi 슬립 모드 비활성화 (연결 안정성 향상)
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   WiFi.setSleep(false);
-
-  // WiFi 연결 상태를 확인하며 연결될 때까지 대기
-  Serial.print("WiFi connecting");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("");
-  Serial.println("WiFi connected");
+  Serial.println("\nWiFi connected");
+
   startCameraServer();
+  xTaskCreatePinnedToCore(sensorTask, "Sensor Task", 2048, NULL, 1, NULL, 1);
 
-  xTaskCreatePinnedToCore(dhtTask, "DHT Sensor Task", 2048, NULL, 1, NULL, 1);
-  xTaskCreatePinnedToCore(flameTask, "Flame Task", 1024, NULL, 1, NULL, 1);
-  // 카메라 서버 실행 함수 호출 (웹 인터페이스 등)
-
-  // 연결된 IP 주소를 출력하여 접속 방법 안내
   Serial.print("Camera Ready! Use 'http://");
   Serial.print(WiFi.localIP());
   Serial.println("' to connect");

@@ -28,6 +28,10 @@ extern DHT dht;         // CameraWebServer.ino 에 정의된 전역 DHT 인스�
 // LED FLASH 기능을 활성화 (0: 비활성, 1: 활성)
 #define CONFIG_LED_ILLUMINATOR_ENABLED 0
 
+extern float cachedTemperature, cachedHumidity;
+extern int cachedFlame;
+extern volatile bool allowStreaming;
+
 // HTTP 응답을 위한 JPEG 청크 정보를 저장하는 구조체
 typedef struct {
   httpd_req_t *req;  // HTTP 요청 핸들
@@ -204,87 +208,57 @@ fb = esp_camera_fb_get();  //바로 프레임 캡처
 
 // 연속 스트리밍 모드에서 캡처한 프레임들을 HTTP 멀티파트 스트림으로 전송하는 핸들러
 static esp_err_t stream_handler(httpd_req_t *req) {
+  // 스트리밍이 일시 중지되어 있다면 대기
+  while (!allowStreaming) {
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+
   camera_fb_t *fb = NULL;
-  struct timeval _timestamp;
   esp_err_t res = ESP_OK;
-  size_t _jpg_buf_len = 0;
-  uint8_t *_jpg_buf = NULL;
-  char *part_buf[128];
 
-  // 이전 프레임 시간 초기화 (프레임 간 시간 측정을 위함)
-  static int64_t last_frame = 0;
-  if (!last_frame) {
-    last_frame = esp_timer_get_time();
-  }
+  // MJPEG 스트림 시작
+  res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);  // "multipart/x-mixed-replace;boundary=frame"
+  if (res != ESP_OK) return res;
 
-  // HTTP 응답 타입과 헤더 설정
-  res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
-  if (res != ESP_OK) {
-    return res;
-  }
-  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-  httpd_resp_set_hdr(req, "X-Framerate", "60");
-
-  // 무한 루프로 프레임을 캡처 및 전송 (스트림 종료 조건은 외부에서 연결 종료)
   while (true) {
-    fb = esp_camera_fb_get();
+    if (!allowStreaming) {
+      vTaskDelay(pdMS_TO_TICKS(100));  // 일시 정지 중일 경우 계속 대기
+      continue;
+    }
+
+    fb = esp_camera_fb_get();  // 프레임 캡처
     if (!fb) {
-      log_e("Camera capture failed");
+      Serial.println("Camera capture failed");
       res = ESP_FAIL;
-    } else {
-      // 프레임 캡처 시간 저장
-      _timestamp.tv_sec = fb->timestamp.tv_sec;
-      _timestamp.tv_usec = fb->timestamp.tv_usec;
-      if (fb->format != PIXFORMAT_JPEG) {
-        // JPEG가 아닌 포맷이면 JPEG로 변환
-        bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
-        esp_camera_fb_return(fb);
-        fb = NULL;
-        if (!jpeg_converted) {
-          log_e("JPEG compression failed");
-          res = ESP_FAIL;
-        }
-      } else {
-        // 이미 JPEG 포맷이면 바로 사용
-        _jpg_buf_len = fb->len;
-        _jpg_buf = fb->buf;
-      }
-    }
-    // 멀티파트 경계 전송
-    if (res == ESP_OK) {
-      res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
-    }
-    // 각 파트의 헤더 전송 (Content-Type, Content-Length, Timestamp)
-    if (res == ESP_OK) {
-      size_t hlen = snprintf((char *)part_buf, 128, _STREAM_PART, _jpg_buf_len, _timestamp.tv_sec, _timestamp.tv_usec);
-      res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
-    }
-    // JPEG 이미지 데이터 전송
-    if (res == ESP_OK) {
-      res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
-    }
-    // 프레임 버퍼 반환 및 할당 해제
-    if (fb) {
-      esp_camera_fb_return(fb);
-      fb = NULL;
-      _jpg_buf = NULL;
-    } else if (_jpg_buf) {
-      free(_jpg_buf);
-      _jpg_buf = NULL;
-    }
-    if (res != ESP_OK) {
-      log_e("Send frame failed");
       break;
     }
-    // 프레임 간 시간 계산 및 평균 프레임 시간 업데이트 (필터 사용)
-    int64_t fr_end = esp_timer_get_time();
-    int64_t frame_time = fr_end - last_frame;
-    last_frame = fr_end;
-    frame_time /= 1000;  // 밀리초 단위 변환
-#if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
-    uint32_t avg_frame_time = ra_filter_run(&ra_filter, frame_time);
-    log_i("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps)", (uint32_t)(_jpg_buf_len), (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, avg_frame_time, 1000.0 / avg_frame_time);
-#endif
+
+    // 스트리밍용 헤더 작성
+    res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));  // --frame\r\n
+    if (res == ESP_OK) {
+      char header_buf[64];
+      int header_len = snprintf(header_buf, sizeof(header_buf),
+                                "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", fb->len);
+      res = httpd_resp_send_chunk(req, header_buf, header_len);
+    }
+
+    if (res == ESP_OK) {
+      res = httpd_resp_send_chunk(req, (const char *)fb->buf, fb->len);  // JPEG 데이터 전송
+    }
+
+    esp_camera_fb_return(fb);  // 프레임 버퍼 반환
+
+    if (res != ESP_OK) {
+      break;
+    }
+
+    // 마지막에 공백 줄 삽입
+    res = httpd_resp_send_chunk(req, "\r\n", 2);
+    if (res != ESP_OK) {
+      break;
+    }
+
+    // vTaskDelay(pdMS_TO_TICKS(10));  // 프레임 간 지연 (필요 시)
   }
 
   return res;
@@ -675,30 +649,27 @@ static esp_err_t index_handler(httpd_req_t *req) {
   }
 }
 
-extern float cachedHumidity;
-extern float cachedTemperature;
-extern int   cachedFlame;
+
 
 static esp_err_t dht_handler(httpd_req_t *req) {
-  if (isnan(cachedHumidity) || isnan(cachedTemperature)) {
+  if (isnan(cachedTemperature) || isnan(cachedHumidity)) {
     return httpd_resp_send_500(req);
   }
   char buf[64];
-  int len = snprintf(buf, sizeof(buf),
-                     "{\"temperature\":%.2f,\"humidity\":%.2f}",
-                     cachedTemperature, cachedHumidity);
+  snprintf(buf, sizeof(buf),
+           "{\"temperature\":%.2f,\"humidity\":%.2f}",
+           cachedTemperature, cachedHumidity);
   httpd_resp_set_type(req, "application/json");
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-  return httpd_resp_send(req, buf, len);
+  return httpd_resp_sendstr(req, buf);
 }
 // 불꽃 센서 상태를 JSON으로 반환 
 static esp_err_t flame_handler(httpd_req_t *req) {
-  int flame = cachedFlame;  // 0: 불꽃 감지, 1: 정상
-  char buf[32]; // JSON 포맷으로
-  int len = snprintf(buf, sizeof(buf), "{\"flame\":%d}", flame);
+  char buf[32];
+  snprintf(buf, sizeof(buf), "{\"flame\":%d}", cachedFlame);
   httpd_resp_set_type(req, "application/json");
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-  return httpd_resp_send(req, buf, len);
+  return httpd_resp_sendstr(req, buf);
 }
 
 // 카메라 서버 및 스트림 서버를 시작하는 함수
