@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'auth_service.dart';
 
 class DeviceService {
   DeviceService._();
@@ -15,7 +16,10 @@ class DeviceService {
 
   Future<List<Map<String, dynamic>>> fetchDevices() async {
     final uri = Uri.parse('$baseUrl/api/devices');
-    final response = await http.get(uri);
+    final token = await AuthService.instance.getIdToken();
+    final response = await http.get(uri, headers: {
+      if (token != null) 'Authorization': 'Bearer $token'
+    });
     if (response.statusCode != 200) {
       throw Exception('Failed to load devices: ${response.statusCode}');
     }

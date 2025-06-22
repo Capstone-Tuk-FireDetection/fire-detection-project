@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'auth_service.dart';
 
 class LogsService {
   LogsService._();
@@ -12,7 +13,10 @@ class LogsService {
     final uri = device != null
         ? Uri.parse('$baseUrl/api/logs?device=$device')
         : Uri.parse('$baseUrl/api/logs');
-    final response = await http.get(uri);
+    final token = await AuthService.instance.getIdToken();
+    final response = await http.get(uri, headers: {
+      if (token != null) 'Authorization': 'Bearer $token'
+    });
     if (response.statusCode != 200) {
       throw Exception('Failed to load logs: ${response.statusCode}');
     }
@@ -25,7 +29,10 @@ class LogsService {
     final uri = device != null
         ? Uri.parse('$baseUrl/api/logs?device=$device')
         : Uri.parse('$baseUrl/api/logs');
-    final response = await http.delete(uri);
+    final token = await AuthService.instance.getIdToken();
+    final response = await http.delete(uri, headers: {
+      if (token != null) 'Authorization': 'Bearer $token'
+    });
     if (response.statusCode != 200) {
       throw Exception('Failed to delete logs: ${response.statusCode}');
     }
