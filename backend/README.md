@@ -23,3 +23,13 @@ Start the Flask app using:
 python run.py
 ```
 
+## User Authentication
+
+The backend now provides simple JSON based authentication. Use the following
+endpoints to register and log in users:
+
+* `POST /api/register` with JSON `{"email": "user@example.com", "password": "pw", "role": "일반"}`
+* `POST /api/login` with JSON `{"email": "user@example.com", "password": "pw"}`
+
+Successful login returns the user's role.
+

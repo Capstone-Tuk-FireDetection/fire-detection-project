@@ -25,12 +25,14 @@ def create_app():
     from .routes.stream import stream_bp
     from .routes.status import status_bp
     from .routes.logs import logs_bp
+    from .routes.user_account import user_account_bp
 
     app.register_blueprint(analyze_bp)
     app.register_blueprint(device_bp)
     app.register_blueprint(stream_bp)
     app.register_blueprint(status_bp)
     app.register_blueprint(logs_bp)
+    app.register_blueprint(user_account_bp)
 
     # Enable Cross-Origin Resource Sharing
     CORS(app)
