@@ -11,6 +11,8 @@ dependencies:
     sdk: flutter
   shared_preferences: ^2.2.2
   http: ^0.13.6
+  firebase_core: ^2.30.0
+  firebase_auth: ^4.18.0
 
 dev_dependencies:
   flutter_test:

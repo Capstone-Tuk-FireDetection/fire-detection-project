@@ -38,3 +38,11 @@ flutter pub get
 flutter run
 ```
 
+### Firebase Authentication
+
+Some API endpoints require a Firebase ID token. The Flutter app now uses
+`firebase_auth` to sign in. Make sure to configure Firebase for your project and
+replace the placeholder values in `lib/firebase_options.dart` with your actual
+settings. After logging in, API requests automatically include the
+`Authorization: Bearer <token>` header.
+
